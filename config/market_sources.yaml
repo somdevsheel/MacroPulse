@@ -1,0 +1,34 @@
+# File-based market data sources. Each is ingested to data/silver/cleaned_prices as UTC Parquet.
+#
+# MetaTrader exports use the BROKER SERVER clock, not UTC. The zone must be established from
+# evidence (see app/ingestion/tz_detect.py and docs/data_quality/) before ingestion.
+
+sources:
+  kaggle_octafx_xauusd:
+    type: metatrader_csv
+    instrument: XAUUSD
+    timeframe: 1m
+    path: data/bronze/gold_prices/kaggle_octafx/XAU_1m_data.csv
+    source_url: https://www.kaggle.com/datasets/novandraanugrah/xauusd-gold-price-historical-data-2004-2024
+    origin: "MetaTrader export, broker OctaFX (per dataset author)"
+    license: CC0-1.0
+    # MetaTrader charts are built from BID prices. Not independently verified.
+    price_side: bid
+    volume_kind: tick
+    # Server clock established empirically from 1-minute volatility spikes at 08:30 ET US releases
+    # (626 unambiguous dates, 2004-2026). See docs/data_quality/kaggle_octafx_xauusd.md.
+    timezone_segments:
+      - {start: "2004-01-01", end: "2011-05-06", tz: Europe/Berlin}
+      - {start: "2011-05-12", end: "2099-12-31", tz: Europe/Athens}
+    # Server-local dates whose clock could not be determined. Excluded, never guessed.
+    quarantine:
+      - {start: "2011-05-07", end: "2011-05-11", reason: "server timezone switch-over window"}
+    # Vendor-built bars ingested as-is (same clock conversion). 5m/15m/1h/4h are instead built
+    # from 1m (vendor 5m and 1h were verified bar-for-bar identical to ours on 2026-11-24).
+    # Vendor 1d/1w/1M bars open at SERVER midnight (= 17:00 New York since 2011-05, i.e. the
+    # forex "NY close" day; 18:00 New York before), not UTC midnight.
+    vendor_timeframes:
+      30m: data/bronze/gold_prices/kaggle_octafx/XAU_30m_data.csv
+      1d: data/bronze/gold_prices/kaggle_octafx/XAU_1d_data.csv
+      1w: data/bronze/gold_prices/kaggle_octafx/XAU_1w_data.csv
+      1M: data/bronze/gold_prices/kaggle_octafx/XAU_1Month_data.csv

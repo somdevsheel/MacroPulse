@@ -1,0 +1,18 @@
+# Tradable instruments studied by the reaction engine. Add more here.
+# pip_size is used for "absolute price movement in pips"; price_precision for display.
+instruments:
+  XAUUSD: {display: "XAU/USD", asset_class: metal, base: XAU, quote: USD, pip_size: 0.01,   price_precision: 2, dukascopy_symbol: XAUUSD, oanda_symbol: XAU_USD}
+  EURUSD: {display: "EUR/USD", asset_class: fx,    base: EUR, quote: USD, pip_size: 0.0001, price_precision: 5, dukascopy_symbol: EURUSD, oanda_symbol: EUR_USD}
+  GBPUSD: {display: "GBP/USD", asset_class: fx,    base: GBP, quote: USD, pip_size: 0.0001, price_precision: 5, dukascopy_symbol: GBPUSD, oanda_symbol: GBP_USD}
+  USDJPY: {display: "USD/JPY", asset_class: fx,    base: USD, quote: JPY, pip_size: 0.01,   price_precision: 3, dukascopy_symbol: USDJPY, oanda_symbol: USD_JPY}
+  USDCHF: {display: "USD/CHF", asset_class: fx,    base: USD, quote: CHF, pip_size: 0.0001, price_precision: 5, dukascopy_symbol: USDCHF, oanda_symbol: USD_CHF}
+  USDCAD: {display: "USD/CAD", asset_class: fx,    base: USD, quote: CAD, pip_size: 0.0001, price_precision: 5, dukascopy_symbol: USDCAD, oanda_symbol: USD_CAD}
+  AUDUSD: {display: "AUD/USD", asset_class: fx,    base: AUD, quote: USD, pip_size: 0.0001, price_precision: 5, dukascopy_symbol: AUDUSD, oanda_symbol: AUD_USD}
+
+# Daily cross-market context series (FRED). Intraday versions are NOT available free.
+macro_context:
+  DGS2:     {name: "US 2Y Treasury yield",          unit: "%",     frequency: daily}
+  DGS10:    {name: "US 10Y Treasury yield",         unit: "%",     frequency: daily}
+  DFII10:   {name: "US 10Y TIPS real yield",        unit: "%",     frequency: daily}
+  VIXCLS:   {name: "CBOE VIX close",                unit: "index", frequency: daily}
+  DTWEXBGS: {name: "Broad trade-weighted USD index (not DXY)", unit: "index", frequency: daily}

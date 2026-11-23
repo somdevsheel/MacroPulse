@@ -1,0 +1,256 @@
+# Configurable economic event universe.
+#
+# `releases` = scheduled publications (one timestamp each). `indicators` = the numbers that
+# come out in a release. Several indicators sharing a release are SIMULTANEOUS announcements.
+#
+# FRED release IDs and series IDs below were verified against the live FRED API (2026-11-24).
+# release_time_et is America/New_York wall-clock; converted to UTC per-date (DST aware).
+#
+# Caveat: FRED release dates also include non-report vintages (e.g. annual seasonal-factor
+# revisions such as CPI on 2024-02-09). Ingestion must only treat a date as an announcement
+# when a NEW reference period first appears in that vintage.
+
+releases:
+  cpi:
+    name: Consumer Price Index
+    provider: fred
+    fred_release_id: 10
+    release_time_et: "08:30"
+  employment_situation:
+    name: Employment Situation
+    provider: fred
+    fred_release_id: 50
+    release_time_et: "08:30"
+  personal_income_outlays:
+    name: Personal Income and Outlays (PCE)
+    provider: fred
+    fred_release_id: 54
+    release_time_et: "08:30"
+  fomc_statement:
+    name: FOMC Statement / Rate Decision
+    provider: fred
+    fred_release_id: 101
+    release_time_et: "14:00"
+    # 2011-2012 statements were 12:30 or 14:15 ET; earlier ~14:15. Times before this date
+    # must be verified per meeting against federalreserve.gov before use.
+    release_time_reliable_from: "2013-01-01"
+  jobless_claims:
+    name: Unemployment Insurance Weekly Claims
+    provider: fred
+    fred_release_id: 180
+    release_time_et: "08:30"
+  jolts:
+    name: JOLTS
+    provider: fred
+    fred_release_id: 192
+    release_time_et: "10:00"
+  gdp:
+    name: Gross Domestic Product
+    provider: fred
+    fred_release_id: 53
+    release_time_et: "08:30"
+  retail_sales:
+    name: Advance Retail Sales
+    provider: fred
+    fred_release_id: 9
+    release_time_et: "08:30"
+  industrial_production:
+    name: Industrial Production (G.17)
+    provider: fred
+    fred_release_id: 13
+    release_time_et: "09:15"
+  durable_goods:
+    name: Durable Goods (M3 Advance)
+    provider: fred
+    fred_release_id: 95
+    release_time_et: "08:30"
+  adp:
+    name: ADP National Employment Report
+    provider: fred
+    fred_release_id: 194
+    release_time_et: "08:15"
+  ism_manufacturing:
+    name: ISM Manufacturing PMI
+    provider: none   # ISM data is licensed; not on FRED. Needs a paid source.
+    release_time_et: "10:00"
+  ism_services:
+    name: ISM Services PMI
+    provider: none
+    release_time_et: "10:00"
+  consumer_confidence:
+    name: Conference Board Consumer Confidence
+    provider: none   # Licensed; not on FRED.
+    release_time_et: "10:00"
+
+# transform: how the headline market-moving number is derived from the FRED level series.
+#   level   -> value as published (e.g. unemployment rate)
+#   change  -> level(t) - level(t-1)          (e.g. NFP, thousands of jobs)
+#   mom_pct -> 100 * (level(t)/level(t-1) - 1)
+#   yoy_pct -> 100 * (level(t)/level(t-12) - 1)   (monthly series)
+#   qoq_saar -> annualised quarterly % change (GDP)
+indicators:
+  cpi_mom:
+    name: CPI m/m
+    release: cpi
+    category: inflation
+    importance: high
+    priority: true
+    fred_series_id: CPIAUCSL
+    transform: mom_pct
+    unit: "%"
+  cpi_yoy:
+    name: CPI y/y
+    release: cpi
+    category: inflation
+    importance: high
+    priority: true
+    fred_series_id: CPIAUCSL
+    transform: yoy_pct
+    unit: "%"
+  core_cpi_mom:
+    name: Core CPI m/m
+    release: cpi
+    category: inflation
+    importance: high
+    priority: true
+    fred_series_id: CPILFESL
+    transform: mom_pct
+    unit: "%"
+  core_cpi_yoy:
+    name: Core CPI y/y
+    release: cpi
+    category: inflation
+    importance: high
+    priority: true
+    fred_series_id: CPILFESL
+    transform: yoy_pct
+    unit: "%"
+  pce_mom:
+    name: PCE Price Index m/m
+    release: personal_income_outlays
+    category: inflation
+    importance: medium
+    priority: false
+    fred_series_id: PCEPI
+    transform: mom_pct
+    unit: "%"
+  core_pce_mom:
+    name: Core PCE Price Index m/m
+    release: personal_income_outlays
+    category: inflation
+    importance: high
+    priority: true
+    fred_series_id: PCEPILFE
+    transform: mom_pct
+    unit: "%"
+  core_pce_yoy:
+    name: Core PCE Price Index y/y
+    release: personal_income_outlays
+    category: inflation
+    importance: high
+    priority: true
+    fred_series_id: PCEPILFE
+    transform: yoy_pct
+    unit: "%"
+  nfp:
+    name: Nonfarm Payrolls
+    release: employment_situation
+    category: employment
+    importance: high
+    priority: true
+    fred_series_id: PAYEMS
+    transform: change
+    unit: "thousands"
+  unemployment_rate:
+    name: Unemployment Rate
+    release: employment_situation
+    category: employment
+    importance: high
+    priority: true
+    fred_series_id: UNRATE
+    transform: level
+    unit: "%"
+  avg_hourly_earnings_mom:
+    name: Average Hourly Earnings m/m
+    release: employment_situation
+    category: employment
+    importance: medium
+    priority: false
+    fred_series_id: CES0500000003
+    transform: mom_pct
+    unit: "%"
+  fomc_rate_upper:
+    name: Fed Funds Target (upper bound)
+    release: fomc_statement
+    category: central_bank
+    importance: high
+    priority: true
+    fred_series_id: DFEDTARU
+    transform: level
+    unit: "%"
+  initial_jobless_claims:
+    name: Initial Jobless Claims
+    release: jobless_claims
+    category: employment
+    importance: medium
+    priority: false
+    fred_series_id: ICSA
+    transform: level
+    unit: "persons"
+  jolts_openings:
+    name: JOLTS Job Openings
+    release: jolts
+    category: employment
+    importance: medium
+    priority: false
+    fred_series_id: JTSJOL
+    transform: level
+    unit: "thousands"
+  gdp_qoq_saar:
+    name: Real GDP q/q (annualised)
+    release: gdp
+    category: growth
+    importance: high
+    priority: false
+    fred_series_id: GDPC1
+    transform: qoq_saar
+    unit: "%"
+  retail_sales_mom:
+    name: Retail Sales m/m
+    release: retail_sales
+    category: growth
+    importance: high
+    priority: false
+    fred_series_id: RSAFS
+    transform: mom_pct
+    unit: "%"
+  industrial_production_mom:
+    name: Industrial Production m/m
+    release: industrial_production
+    category: growth
+    importance: medium
+    priority: false
+    fred_series_id: INDPRO
+    transform: mom_pct
+    unit: "%"
+  durable_goods_mom:
+    name: Durable Goods Orders m/m
+    release: durable_goods
+    category: growth
+    importance: medium
+    priority: false
+    fred_series_id: DGORDER
+    transform: mom_pct
+    unit: "%"
+  adp_employment_change:
+    name: ADP Employment Change
+    release: adp
+    category: employment
+    importance: medium
+    priority: false
+    fred_series_id: ADPWNUSNERSA
+    transform: change
+    unit: "persons"
+
+# Non-numeric Fed events (minutes, press conferences, SEP, Chair speeches) have no
+# actual-vs-forecast value. They are tracked as timestamped events only (Phase 2+).
