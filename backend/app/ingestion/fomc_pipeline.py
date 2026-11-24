@@ -138,11 +138,20 @@ def run_fomc(session: Session, universe: Universe, start: date, end: date,
             counts[source] = counts.get(source, 0) + 1
             prev, actual = rate_around(rates, m.decision_date)
             ts = ny_local_to_utc(m.decision_date, t)
-            exists = session.scalar(select(EconomicEvent.event_id).where(
+            existing = session.scalar(select(EconomicEvent).where(
                 EconomicEvent.indicator_key == ind.key,
                 EconomicEvent.reference_period == m.decision_date,
                 EconomicEvent.source == "fed_calendar"))
-            if exists:
+            if existing is not None:
+                # Fill in a past-due decision once FRED has the new rate; never overwrite.
+                if existing.actual_value is None and actual is not None:
+                    existing.actual_value, existing.previous_value = actual, prev
+                    existing.details = {**(existing.details or {}), "status": "released"}
+                    session.add(EconomicEventSnapshot(
+                        event_id=existing.event_id, snapshot_kind="release",
+                        source_timestamp=existing.scheduled_release_time, actual_value=actual,
+                        previous_value=prev, provider="fed_calendar",
+                        ingestion_job_id=stats.job_id, raw={"filled_after_release": True}))
                 continue
             ev = EconomicEvent(
                 provider_event_id=f"fomc:{m.decision_date}", indicator_key=ind.key,

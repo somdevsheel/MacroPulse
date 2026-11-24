@@ -29,8 +29,25 @@ uv run python -m app.ingestion.cli prices --source kaggle_octafx_xauusd   # gold
 uv run python -m app.ingestion.cli fred-events --priority                 # CPI/PCE/NFP/UNRATE events
 uv run python -m app.ingestion.cli fomc                                   # FOMC decisions
 uv run python -m app.ingestion.cli windows --instrument XAUUSD            # event price windows
+uv run python -m app.ingestion.cli macro                                  # daily yields/VIX/USD
+uv run python -m app.ingestion.cli train --instrument XAUUSD              # baselines, walk-forward
+uv run python -m app.ingestion.cli upcoming                               # scheduled releases
+uv run python -m app.ingestion.cli scheduler                              # keep everything updated
 ```
 Add `--database-url sqlite:///dev.db` before the subcommand to run without PostgreSQL.
+
+## Milestone 1 UI (historical news reaction)
+
+```bash
+# terminal 1 — API (any DATABASE_URL; SQLite dev DB shown)
+cd backend
+DATABASE_URL=sqlite:///$PWD/../data/dev.db uv run uvicorn app.api.main:app --port 8010
+
+# terminal 2 — frontend (proxies /api to 127.0.0.1:8010; override with MACROPULSE_API=...)
+cd frontend
+npm install
+npm run dev                   # http://localhost:5173
+```
 
 ## Tests
 

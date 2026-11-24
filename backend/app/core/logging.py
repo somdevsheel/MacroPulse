@@ -24,7 +24,7 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging(level: str = "INFO", json_logs: bool = False) -> None:
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stderr)  # stdout stays clean for CLI output
     if json_logs:
         handler.setFormatter(JsonFormatter())
     else:

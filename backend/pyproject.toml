@@ -17,6 +17,10 @@ dependencies = [
     "polars>=2.1.0",
     "duckdb>=2.0.1",
     "pyarrow>=26.0.1",
+    "scikit-learn>=1.9.1",
+    "xgboost>=3.2.0",
+    "lightgbm>=4.7.0",
+    "joblib>=1.6.0",
 ]
 
 [dependency-groups]

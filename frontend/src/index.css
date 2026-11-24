@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0e13;
+  --color-panel: #11161e;
+  --color-line: #1f2733;
+  --color-muted: #7d8899;
+  --color-text: #d7dde6;
+  --color-up: #26a69a;
+  --color-down: #ef5350;
+  --color-accent: #f0b429;
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-bg text-text font-mono text-[13px] antialiased; }
+select, input { @apply bg-panel border border-line rounded px-2 py-1 text-text outline-none focus:border-accent; }
+table { @apply w-full border-collapse; }
+th { @apply text-left font-normal text-muted px-2 py-1 border-b border-line whitespace-nowrap; }
+td { @apply px-2 py-1 border-b border-line/50 whitespace-nowrap tabular-nums; }

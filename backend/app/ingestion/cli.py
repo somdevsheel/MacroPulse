@@ -85,6 +85,67 @@ def cmd_windows(a) -> None:
     print(json.dumps(run_windows(session, get_universe(), a.provider, a.instrument), indent=2))
 
 
+def cmd_macro(a) -> None:
+    from app.ingestion.macro_context import run_macro_context
+
+    print(json.dumps(run_macro_context(_session(a.database_url), get_universe(),
+                                       get_settings().resolved_data_dir(),
+                                       date.fromisoformat(a.start), datetime.now(UTC).date()),
+                     indent=2))
+
+
+def cmd_train(a) -> None:
+    from app.core.config import REPO_ROOT
+    from app.prediction_engine.train import format_summary, run_training
+
+    session = _session(a.database_url)
+    if session is None:
+        raise SystemExit("DATABASE_URL not set; pass --database-url (e.g. sqlite:///dev.db)")
+    out = run_training(session, a.instrument, a.provider, get_settings().resolved_data_dir(),
+                       REPO_ROOT / "models")
+    if a.json:
+        print(json.dumps(out, indent=2, default=str))
+    else:
+        print(format_summary(out))
+
+
+def cmd_upcoming(a) -> None:
+    from app.ingestion.upcoming import run_upcoming
+
+    print(json.dumps(run_upcoming(_require_session(a), get_universe(), a.days), indent=2))
+
+
+def cmd_evaluate(a) -> None:
+    from app.prediction_engine.base_rate import evaluate_pending
+
+    print(json.dumps(evaluate_pending(_require_session(a)), indent=2))
+
+
+def cmd_scheduler(a) -> None:
+    from app.scheduler.runner import run_scheduler
+
+    run_scheduler(_require_session(a), once=a.once)
+
+
+def _require_session(a) -> Session:
+    s = _session(a.database_url)
+    if s is None:
+        raise SystemExit("DATABASE_URL not set; pass --database-url (e.g. sqlite:///dev.db)")
+    return s
+
+
+def cmd_oanda(a) -> None:
+    from app.ingestion.oanda_pipeline import run_oanda
+
+    u = get_universe()
+    symbols = a.symbols or list(u.instruments)
+    start = datetime.fromisoformat(a.start).replace(tzinfo=UTC)
+    end = datetime.fromisoformat(a.end).replace(tzinfo=UTC) if a.end else None
+    out = run_oanda(_session(a.database_url), u, get_settings().resolved_data_dir(), symbols,
+                    start, end, workers=a.workers)
+    print(json.dumps(out, indent=2, default=str))
+
+
 def cmd_tz_check(a) -> None:
     from app.ingestion.fred_events import VintageStore
     from app.ingestion.tz_detect import score_dates, summarize_runs
@@ -136,6 +197,34 @@ def main() -> None:
     sw.add_argument("--provider", default="kaggle_octafx_xauusd")
     sw.add_argument("--instrument", default="XAUUSD")
     sw.set_defaults(fn=cmd_windows)
+
+    sm = sub.add_parser("macro", help="daily yields/VIX/USD index from FRED to silver")
+    sm.add_argument("--start", default="2003-01-01")
+    sm.set_defaults(fn=cmd_macro)
+
+    sx = sub.add_parser("train", help="train/evaluate baseline models (walk-forward)")
+    sx.add_argument("--provider", default="kaggle_octafx_xauusd")
+    sx.add_argument("--instrument", default="XAUUSD")
+    sx.add_argument("--json", action="store_true")
+    sx.set_defaults(fn=cmd_train)
+
+    su = sub.add_parser("upcoming", help="scheduled future releases from the FRED calendar")
+    su.add_argument("--days", type=int, default=75)
+    su.set_defaults(fn=cmd_upcoming)
+
+    se = sub.add_parser("evaluate", help="score stored predictions whose outcome is known")
+    se.set_defaults(fn=cmd_evaluate)
+
+    sc = sub.add_parser("scheduler", help="run periodic update jobs (Ctrl-C to stop)")
+    sc.add_argument("--once", action="store_true", help="run every job once and exit")
+    sc.set_defaults(fn=cmd_scheduler)
+
+    sa = sub.add_parser("oanda", help="OANDA 1m bid/ask/mid history (resumable) -> silver")
+    sa.add_argument("--symbols", nargs="*", help="e.g. EURUSD XAUUSD (default: all)")
+    sa.add_argument("--start", default="2005-01-01")
+    sa.add_argument("--end")
+    sa.add_argument("--workers", type=int, default=4)
+    sa.set_defaults(fn=cmd_oanda)
 
     st = sub.add_parser("tz-check", help="infer a price file's clock from release spikes")
     st.add_argument("--source", required=True)

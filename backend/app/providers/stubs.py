@@ -31,20 +31,6 @@ class TradingEconomicsProvider(EconomicCalendarProvider):
         raise NotImplementedError("Trading Economics adapter pending (needs paid subscription)")
 
 
-class OandaProvider(MarketDataProvider):
-    """v20 REST: GET /v3/instruments/{instrument}/candles (M1, bid/ask/mid). Free practice
-    account works for historical candles."""
-
-    key = "oanda"
-    name = "OANDA v20"
-
-    def is_configured(self) -> bool:
-        return _has(get_settings().oanda_api_token)
-
-    def candles_1m(self, symbol: str, start: datetime, end: datetime) -> Iterable[Candle]:
-        raise NotImplementedError("OANDA adapter pending")
-
-
 class TwelveDataProvider(MarketDataProvider):
     key = "twelve_data"
     name = "Twelve Data"

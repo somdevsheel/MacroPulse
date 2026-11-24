@@ -75,6 +75,18 @@ def store_events(session: Session, universe: Universe, built: list[BuiltEvent],
             session.add(ev)
             session.flush()
             n_events += 1
+        elif ev.actual_value is None and b.actual_value is not None:
+            # An upcoming event has now been published: fill it in (first print). Values that
+            # were already published are never overwritten -- revisions go to snapshots.
+            ev.actual_value = b.actual_value
+            ev.previous_value = b.previous_value
+            ev.revised_previous_value = b.revised_previous_value
+            if ev.scheduled_release_time != b.scheduled_release_time:
+                ev.details = {**(ev.details or {}), "rescheduled_from":
+                              str(ev.scheduled_release_time)}
+            ev.scheduled_release_time = b.scheduled_release_time
+            ev.details = {**(ev.details or {}), "status": "released"}
+            n_events += 1
         have = set(session.scalars(select(EconomicEventSnapshot.source_timestamp).where(
             EconomicEventSnapshot.event_id == ev.event_id,
             EconomicEventSnapshot.provider == "fred")).all())

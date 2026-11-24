@@ -34,7 +34,9 @@ def resolve_provider(instrument: str, provider: str | None) -> str:
         return provider
     if not srcs:
         raise HTTPException(404, f"no price data ingested for {instrument}")
-    return srcs[0]["provider"]
+    names = [s["provider"] for s in srcs]
+    # Prefer OANDA (UTC timestamps, bid/ask, live-updatable) when it covers the instrument.
+    return "oanda" if "oanda" in names else names[0]
 
 
 def _event_json(e: EconomicEvent) -> dict:
@@ -135,3 +137,37 @@ def similar(event_id: int, db: DB, instrument: str = "XAUUSD", provider: str | N
         return similar_events(db, event_id, instrument, resolve_provider(instrument, provider), k)
     except KeyError:
         raise HTTPException(404, "event not found") from None
+
+
+@router.get("/models")
+def models(db: DB, run: str | None = None) -> dict:
+    """Model registry for one training run (default: latest), grouped by task."""
+    from app.models import ModelRegistry
+
+    runs = sorted({v for (v,) in db.execute(select(ModelRegistry.version).distinct())},
+                  reverse=True)
+    if not runs:
+        return {"runs": [], "run": None, "tasks": {}}
+    run = run or runs[0]
+    if run not in runs:
+        raise HTTPException(404, f"unknown run {run}")
+    tasks: dict[str, dict] = {}
+    for m in db.scalars(select(ModelRegistry).where(ModelRegistry.version == run)
+                        .order_by(ModelRegistry.model_id)):
+        t = tasks.setdefault(m.target, {"task": m.target, "phase": m.phase, "models": []})
+        metrics = m.metrics or {}
+        t["models"].append({
+            "model_id": m.model_id, "algorithm": m.algorithm, "status": m.status,
+            "selected": metrics.get("selected", False),
+            "beats_prior": metrics.get("beats_prior"),
+            "vs_prior_walk_forward": metrics.get("vs_prior_walk_forward"),
+            "walk_forward": metrics.get("walk_forward"), "validation": metrics.get("validation"),
+            "test": metrics.get("test"), "per_fold": metrics.get("per_fold"),
+            "calibration_p_bullish": metrics.get("calibration_p_bullish"),
+            "feature_set_version": m.feature_set_version,
+        })
+    return {"runs": runs, "run": run, "tasks": tasks,
+            "protocol": "expanding walk-forward by year 2012-2025 with 1-day embargo; fixed "
+                        "split train<=2021 / validation 2022-23 / test 2024-25; selection on "
+                        "validation only; 'beats prior' = paired-bootstrap 95% CI of the "
+                        "walk-forward loss difference entirely below 0"}

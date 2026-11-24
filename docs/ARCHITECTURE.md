@@ -17,7 +17,7 @@ upcoming releases. Research and prediction only — no trade execution.
 | FRED release 101 | FOMC decision dates | ❌ | Lists **every calendar day** — unusable for meeting dates. Needs the Federal Reserve meeting calendar. DFEDTARU shows a new target effective the day *after* the decision. |
 | Kaggle XAU/USD (OctaFX MT) | Gold 1m bars 2004-06 → 2026-01 | ✅ ingested | CC0. Broker clock CET→EET (detected empirically). Gaps in Sep–Oct 2025 and Jan 2026. See data_quality/. |
 | **Dukascopy** | 1-min bid/ask candles, all 7 instruments | ⚠️ | Free datafeed returns 429 and points to its data-export wiki: bulk history is now an AWS S3 **Requester Pays** bucket (`cfg-public-proper-wallaby`, eu-west-1) — needs an AWS account; you pay transfer costs. |
-| **OANDA v20** | 1-min bid/ask/mid candles (fallback/reconciliation) | ⏳ | Needs a (free practice) API token. Adapter stub reports `disconnected`. |
+| **OANDA v20** | 1-min bid/ask/mid candles, all 7 instruments | ✅ ingested | Practice token. UTC. 54.1M bars 2005→now, 0 invalid; gaps = market holidays. Hourly incremental updates. See data_quality/oanda.md. |
 | Twelve Data | Optional candles | ⏳ | Needs key; free tier is limited. |
 | **Trading Economics** | Consensus forecasts | ❌ | Paid. **No other legitimate source of historical consensus is available.** |
 | ISM PMI, Conference Board | Indicators | ❌ | Licensed, not on FRED. Configured with `provider: none`. |
@@ -92,15 +92,57 @@ Storage split:
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Repo setup, config, schema + migrations, provider interfaces, FRED adapter, tests | ✅ done |
-| 2 | ✅ FRED vintages → events + snapshots (revision-date filtering, verified vs published NFP/CPI/PCE). ✅ Gold 1m from Kaggle/OctaFX → UTC silver Parquet + 5m/15m/1h/4h + quality report ([details](data_quality/kaggle_octafx_xauusd.md)). ✅ Ingestion job logging. ✅ FOMC calendar (federalreserve.gov) + policy rate (DFEDTAR/DFEDTARU) with statement minute verified by gold spikes; unscheduled/conference calls and conflicts excluded. ⏳ FX pairs 1m (no source yet). ⏳ Daily macro context. ⏳ Provider registry sync | in progress |
-| 3 | ✅ Event windows + aggregate studies + similar-event kNN + API (`/api/v1/events`, `/events/{id}/bars`, `/analysis/reactions`, `/events/{id}/similar`) for gold. ⏳ Milestone 1 UI. FX pairs pending a data source. | in progress |
-| 4 | Similar-event retrieval (kNN with documented distance), clustering | |
-| 5 | Baselines (logreg, RF, XGBoost/LightGBM), walk-forward with embargo, registry | |
-| 6 | Prediction API + full dashboard | |
-| 7 | Scheduler, live pre/post predictions, paper evaluation | |
+| 2 | ✅ FRED vintages → events + snapshots (revision-date filtering, verified vs published NFP/CPI/PCE). ✅ Gold 1m from Kaggle/OctaFX → UTC silver Parquet + 5m/15m/1h/4h + quality report ([details](data_quality/kaggle_octafx_xauusd.md)). ✅ Ingestion job logging. ✅ FOMC calendar (federalreserve.gov) + policy rate (DFEDTAR/DFEDTARU) with statement minute verified by gold spikes; unscheduled/conference calls and conflicts excluded. ✅ FX pairs + XAU 1m bid/ask/mid from OANDA (2005→now). ⏳ Daily macro context. ⏳ Provider registry sync | in progress |
+| 3 | ✅ Event windows + aggregate studies + similar-event kNN + API (`/api/v1/events`, `/events/{id}/bars`, `/analysis/reactions`, `/events/{id}/similar`) for gold. ✅ Milestone 1 UI (React/TS/Tailwind/Lightweight Charts): event/instrument/date filters, 11-window stats, event list, 1m chart with release marker, per-window metrics, simultaneous releases, similar events. FX pairs pending a data source. | ✅ gold |
+| 4 | ✅ Similar-event kNN (documented z-score Euclidean, past events only). ⏳ Clustering (k-means/HDBSCAN/DTW) — deferred: little value until consensus surprise and FX data exist. | partial |
+| 5 | ✅ Point-in-time feature set v1 (one sample per release timestamp), prior / logreg / RF / XGBoost / LightGBM, yearly expanding walk-forward 2012–2025 with embargo, fixed 2022–23 val / 2024–25 test split, paired-bootstrap test vs baseline, registry + per-fold metrics + OOS predictions + artifacts, Model Performance UI. **Result (gold): no model beats the baseline** — see §8. | ✅ gold |
+| 6 | ✅ Prediction + calendar + data-status API; UI tabs: Economic calendar, Historical event analysis, Model performance, Data management. ⏳ Settings screen, auth, WebSockets (polling/countdown only for now). | mostly |
+| 7 | ✅ Upcoming releases from FRED calendar (+ Fed meetings), fill-in on publication, scheduler loop, stored pre-release predictions (historical base rate — the only predictor with no worse out-of-sample loss), automatic evaluation when post-release prices exist. ⏳ Needs a live price feed (OANDA) for evaluation of new events; post-release live predictions pending a model with demonstrated edge. | partial |
 
 **Milestone 1 dependency:** 1-minute price data. FRED side is ready; Phase 2 must get Dukascopy
 downloading reliably or an OANDA practice token must be added to `.env`.
+
+## 8. Baseline model results (gold, run 2026-11-24)
+
+~890 release events (CPI, NFP, Core PCE, FOMC) 2004–2026. Baseline = historical up/flat/down
+frequencies (or mean |move|) per release type, fitted on the training window only.
+
+| Task | Selected (on validation) | Δ loss vs baseline, walk-forward 2012–2025 (95% CI) |
+|---|---|---|
+| pre-release direction +15m | random forest | +0.002 [−0.011, +0.016] |
+| pre-release direction +60m | random forest | +0.004 [−0.012, +0.020] |
+| pre-release \|move\| +60m | XGBoost | −0.001 [−0.012, +0.012] |
+| post-release (+5m) direction →+15m | XGBoost | +0.015 [−0.008, +0.040] |
+| post-release (+5m) direction →+60m | random forest | −0.007 [−0.021, +0.006] |
+
+No task shows a statistically supported improvement over the baseline, so no model is marked
+`active`. Expected with this data: no consensus (so no true surprise), one instrument, daily-only
+cross-market context. The highest-value next inputs are consensus forecasts and intraday
+DXY/yields; the pipeline will re-evaluate automatically when they are added.
+
+### 8b. All 7 instruments, OANDA 1m (runs 2026-11-24 06:52–06:56 UTC)
+
+~940 release timestamps per pair (2005–2026), 35 instrument × task tests. A model is `active`
+only if the paired-bootstrap 95% CI on walk-forward 2012–2025 is below 0 **and** it also beats
+the baseline on the 2024–25 hold-out.
+
+| Active | Δ log loss WF | Δ hold-out 2024–25 | Direction hit |
+|---|---|---|---|
+| USD/CHF post-release 5→15m | −0.036 [−0.054, −0.019] | −0.067 | 51% |
+| USD/CAD post-release 5→15m | −0.031 [−0.057, −0.005] | −0.058 | 52% |
+| EUR/USD post-release 5→15m | −0.022 [−0.037, −0.008] | −0.020 | 49% |
+| GBP/USD post-release 5→15m | −0.020 [−0.035, −0.005] | −0.036 | 53% |
+| XAU/USD pre-release \|move\| 60m (MAE) | −0.009 [−0.018, −0.000] | −0.012 | – |
+
+Interpretation:
+- **Multiple testing:** with Holm correction over the 35 tests only USD/CHF 5→15m remains
+  individually significant. The *consistency* of the 5→15m result across four USD pairs, in both
+  the walk-forward and the hold-out years, is the stronger evidence.
+- **Not a directional edge.** Directional hit rates are 49–53% (coin flip). The gain comes from
+  estimating whether the move after the first 5 minutes stays large or fades (the neutral-band
+  probability) — useful for volatility/risk, not for calling direction.
+- Pre-release direction: no edge on any instrument. USD/JPY's walk-forward "wins" failed the
+  hold-out and were demoted.
 
 ## 7. Open decisions for the owner
 

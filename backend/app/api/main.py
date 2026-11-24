@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analysis import router as analysis_router
+from app.api.live import router as live_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.universe import get_universe
@@ -23,8 +24,9 @@ app = FastAPI(
 # Dev frontend (Vite). Tighten for production.
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173",
                                                   "http://127.0.0.1:5173"],
-                   allow_methods=["GET"], allow_headers=["*"])
+                   allow_methods=["GET", "POST"], allow_headers=["*"])
 app.include_router(analysis_router)
+app.include_router(live_router)
 
 
 @app.get("/health")

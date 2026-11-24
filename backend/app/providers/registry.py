@@ -4,7 +4,8 @@ from app.providers.base import BaseProvider, ProviderHealth
 from app.providers.economic.fed_calendar import FedCalendarProvider
 from app.providers.macro.fred import FredProvider
 from app.providers.market.dukascopy import DukascopyProvider
-from app.providers.stubs import OandaProvider, TradingEconomicsProvider, TwelveDataProvider
+from app.providers.market.oanda import OandaProvider
+from app.providers.stubs import TradingEconomicsProvider, TwelveDataProvider
 
 PROVIDER_CLASSES: list[type[BaseProvider]] = [
     FredProvider,
